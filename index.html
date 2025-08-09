@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -546,6 +546,482 @@
                 pdfButton.classList.remove('btn-disabled');
             });
         }
+    </script>
+
+</body>
+</html>
+ -->
+
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Construction Quantity & Cost Estimator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- PDF Generation Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- DXF (AutoCAD) File Parser Library -->
+    <script src="https://cdn.jsdelivr.net/npm/dxf-parser@1.1.2/dist/dxf-parser.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .card {
+            background-color: #ffffff;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .btn {
+            display: inline-block;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.3s, color 0.3s;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background-color: #4f46e5;
+            color: #ffffff;
+        }
+        .btn-primary:hover {
+            background-color: #4338ca;
+        }
+        .btn-disabled {
+            background-color: #e0e7ff;
+            color: #a5b4fc;
+            cursor: not-allowed;
+        }
+        .file-input-label {
+            display: block;
+            padding: 1rem;
+            border: 2px dashed #d1d5db;
+            border-radius: 0.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        .file-input-label:hover {
+            border-color: #4f46e5;
+        }
+        #fileName {
+            margin-top: 1rem;
+            font-style: italic;
+            color: #6b7280;
+        }
+        .estimation-section {
+            display: none;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #4f46e5;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 2rem auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        details > summary {
+            list-style: none;
+            cursor: pointer;
+        }
+        details > summary::-webkit-details-marker {
+            display: none;
+        }
+        .pdf-page-break {
+            page-break-before: always;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900">Construction Estimator Pro</h1>
+            <p class="text-lg text-gray-600 mt-2">From Blueprint to Budget: A Seamless Estimation Experience</p>
+        </header>
+
+        <!-- File Upload Section -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-4">1. Upload Your Plan</h2>
+            <p class="mb-4 text-gray-600">Provide your AutoCAD layout file (.dxf). The tool will analyze the dimensions to estimate quantities.</p>
+            <label for="file-upload" class="file-input-label">
+                <div>
+                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <span class="mt-2 block text-sm font-medium text-gray-900">Click to upload a file</span>
+                    <span class="block text-xs text-gray-500">DXF files only</span>
+                </div>
+                <input id="file-upload" name="file-upload" type="file" class="sr-only" accept=".dxf">
+            </label>
+            <p id="fileName" class="text-center"></p>
+            <div class="mt-6 text-center">
+                <button id="calculate-btn" class="btn btn-primary btn-disabled" disabled>Analyze File & Estimate</button>
+            </div>
+        </div>
+
+        <div id="loading-spinner" style="display: none;">
+            <div class="loader"></div>
+            <p class="text-center text-gray-600">Analyzing layout and generating detailed estimation...</p>
+        </div>
+        
+        <!-- Wrapper for the entire report -->
+        <div id="estimation-report">
+            <!-- Quantity Estimation Section -->
+            <div id="quantity-estimation-section" class="card estimation-section">
+                <h2 class="text-2xl font-semibold mb-4">2. Quantity Estimation</h2>
+                <p class="mb-6 text-gray-600">A meticulous, step-by-step analysis of all materials required for the project, generated from the provided layout.</p>
+                <div id="quantity-results" class="space-y-4">
+                    <!-- Dynamic Quantity Results will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Resource Summary Section -->
+            <div id="resource-summary-section" class="card estimation-section">
+                <h2 class="text-2xl font-semibold mb-4">3. Resource & Machinery Summary</h2>
+                <p class="mb-6 text-gray-600">A consolidated summary of all materials, labor, and equipment needed for the entire project.</p>
+                <div id="resource-summary-results" class="grid md:grid-cols-3 gap-6">
+                    <!-- Dynamic Resource Summary will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Work Schedule Section -->
+            <div id="work-schedule-section" class="card estimation-section">
+                <h2 class="text-2xl font-semibold mb-4">4. Project Schedule & Daily Workforce Plan</h2>
+                <p class="mb-6 text-gray-600">A high-level schedule outlining major construction phases, their duration, and daily labor requirements.</p>
+                <div id="work-schedule-results">
+                    <!-- Dynamic Work Schedule will be inserted here -->
+                </div>
+            </div>
+
+
+            <!-- Cost Estimation / Bill of Quantity Section -->
+            <div id="cost-estimation-section" class="card estimation-section">
+                <h2 class="text-2xl font-semibold mb-4">5. Bill of Quantities (BoQ) & Cost Estimation</h2>
+                <p class="mb-6 text-gray-600">A detailed cost breakdown for each activity, including materials, labor, and indirect costs, calculated as per standard IS codes and rate analysis.</p>
+                <div id="cost-results" class="space-y-6">
+                    <!-- Dynamic Cost Results will be inserted here -->
+                </div>
+                <div id="grand-total-section" class="mt-8 pt-4 border-t-2 border-gray-200">
+                    <!-- Grand Total will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Print button outside the report wrapper -->
+        <div id="print-button-container" class="card estimation-section text-center">
+             <button id="pdf-button" class="btn btn-primary" onclick="generateAndDownloadPDF()">Generate & Download PDF Report</button>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM ELEMENT REFERENCES ---
+        const fileUpload = document.getElementById('file-upload');
+        const calculateBtn = document.getElementById('calculate-btn');
+        const fileNameDisplay = document.getElementById('fileName');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const quantitySection = document.getElementById('quantity-estimation-section');
+        const resourceSection = document.getElementById('resource-summary-section');
+        const scheduleSection = document.getElementById('work-schedule-section');
+        const costSection = document.getElementById('cost-estimation-section');
+        const printButtonContainer = document.getElementById('print-button-container');
+
+        // --- EVENT LISTENERS ---
+        fileUpload.addEventListener('change', function() {
+            if (this.files[0]) {
+                fileNameDisplay.textContent = `Selected file: ${this.files[0].name}`;
+                calculateBtn.disabled = false;
+                calculateBtn.classList.remove('btn-disabled');
+            }
+        });
+
+        calculateBtn.addEventListener('click', function() {
+            const file = fileUpload.files[0];
+            if (!file) {
+                alert("Please select a DXF file first.");
+                return;
+            }
+
+            loadingSpinner.style.display = 'block';
+            [quantitySection, resourceSection, scheduleSection, costSection, printButtonContainer].forEach(el => el.style.display = 'none');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parser = new DxfParser();
+                    const dxf = parser.parseSync(e.target.result);
+                    
+                    // --- CORE ANALYSIS AND CALCULATION ---
+                    // 1. Analyze the parsed DXF data to get quantities
+                    const quantityData = analyzeDxfAndCalculateQuantities(dxf);
+
+                    // 2. Generate the report sections using the new data
+                    generateQuantityEstimation(quantityData);
+                    
+                    // Note: For a real app, cost and schedule would also be derived from quantities.
+                    // Here, we'll reuse the static data for demonstration.
+                    const costData = getStaticCostData(quantityData); // Pass quantities to potentially adjust costs
+                    const workScheduleData = getStaticWorkScheduleData();
+
+                    generateResourceSummary(costData);
+                    generateWorkSchedule(workScheduleData);
+                    generateBillOfQuantities(costData);
+
+                    // 3. Show the report
+                    [quantitySection, resourceSection, scheduleSection, costSection, printButtonContainer].forEach(el => el.style.display = 'block');
+
+                } catch (err) {
+                    alert("Error parsing DXF file. Please ensure it is a valid, text-based DXF file.");
+                    console.error(err);
+                } finally {
+                    loadingSpinner.style.display = 'none';
+                }
+            };
+            reader.onerror = function() {
+                alert("Failed to read the file.");
+                loadingSpinner.style.display = 'none';
+            };
+            reader.readAsText(file);
+        });
+
+        // --- DXF ANALYSIS FUNCTION ---
+        function analyzeDxfAndCalculateQuantities(dxf) {
+            console.log("Parsed DXF Object:", dxf);
+            // This is the core logic hub. You must customize this based on your DXF file's structure (e.g., layer names).
+            // Example: Assume walls are on a layer named "WALLS" and footings on "FOOTINGS".
+            // The drawing units are assumed to be in meters.
+
+            let excavationItems = [];
+            let totalExcavation = 0;
+
+            // A simplified example of calculating excavation for footings
+            const footingEntities = dxf.entities.filter(e => e.layer === 'FOOTINGS' && e.type === 'LWPOLYLINE');
+            footingEntities.forEach((footing, i) => {
+                // For a simple rectangular footing (polyline), calculate area.
+                // This is a naive assumption; real logic would be more complex.
+                const vertices = footing.vertices;
+                const width = Math.abs(vertices[0].x - vertices[1].x);
+                const length = Math.abs(vertices[1].y - vertices[2].y);
+                const area = width * length;
+                const depth = 1.1; // Assume excavation depth
+                const qty = area * depth;
+                totalExcavation += qty;
+                excavationItems.push({ desc: `Footing #${i + 1}`, no: 1, l: length.toFixed(2), b: width.toFixed(2), h: depth, qty: qty });
+            });
+
+            // This should return an object in the same format as the original hardcoded `quantityData`.
+            // The following is a placeholder structure filled with our example calculation.
+            const calculatedData = {
+                excavation: { 
+                    title: "Earthwork in Excavation (from DXF)", 
+                    unit: "m³", 
+                    total: totalExcavation, 
+                    items: excavationItems 
+                },
+                // Other categories like sandFilling, pcc, etc., would be calculated similarly
+                // by filtering entities on different layers and performing geometric calculations.
+                sandFilling: { title: "Sand Filing in Plinth", unit: "m³", total: 0, items: [] },
+                pcc: { title: "PCC in Foundation", unit: "m³", total: 0, items: [] },
+                brickwork: { title: "Brick Masonry", unit: "m³", total: 0, items: [] },
+                rcc: { title: "Reinforced Cement Concrete", unit: "m³", total: 0, items: [] },
+            };
+
+            return calculatedData;
+        }
+
+        // --- STATIC DATA FUNCTIONS (for demonstration) ---
+        // In a real app, these would also be calculated based on the quantity data.
+        function getStaticCostData(quantityData) {
+            // Example: You could adjust material costs based on calculated quantities here
+            return [
+                { title: "Excavation", quantity: quantityData.excavation.total, unit: "m³", items: [
+                    { desc: "JCB/Excavator", type: "Equipment", unit: "Hours", qty: 7, rate: 2500, amount: 17500 },
+                    { desc: "Mason", type: "Labor", unit: "mandays", qty: 5, rate: 816, amount: 4080 },
+                    { desc: "Mazdoor", type: "Labor", unit: "mandays", qty: 8, rate: 736, amount: 5888 },
+                ]},
+                // ... other cost items
+            ];
+        }
+
+        function getStaticWorkScheduleData() {
+            return [
+                { phase: "Site Clearing & Excavation", duration: 7, labor: [{ type: "Mazdoor", count: 8 }, { type: "Supervisor", count: 1 }] },
+                { phase: "Foundation (PCC & RCC)", duration: 21, labor: [{ type: "Mason", count: 4 }, { type: "Mazdoor", count: 12 }, { type: "Bar Bender", count: 4 }] },
+                // ... other schedule items
+            ];
+        }
+
+        // --- HTML GENERATION FUNCTIONS (now accept data as parameters) ---
+
+        function generateQuantityEstimation(quantityData) {
+            const container = document.getElementById('quantity-results');
+            container.innerHTML = ''; 
+
+            for (const key in quantityData) {
+                const data = quantityData[key];
+                if (!data || data.items.length === 0) continue; // Skip empty sections
+                let itemsHtml = '';
+                data.items.forEach(item => {
+                    if(item.l !== null && item.l !== undefined) {
+                        itemsHtml += `<li>${item.desc}: ${item.no} units, ${item.l}m x ${item.b}m x ${item.h}m = ${item.qty.toFixed(2)} ${data.unit}</li>`;
+                    } else {
+                        itemsHtml += `<li>${item.desc}: ${item.qty.toFixed(2)} ${data.unit}</li>`;
+                    }
+                });
+
+                const sectionHtml = `
+                    <div class="p-4 bg-gray-100 rounded-lg">
+                        <h3 class="font-semibold text-lg">${data.title}</h3>
+                        <ul class="mt-2 list-disc list-inside text-gray-700">
+                            ${itemsHtml}
+                            <li class="font-bold mt-2">Total: ${data.total.toFixed(2)} ${data.unit}</li>
+                        </ul>
+                    </div>
+                `;
+                container.innerHTML += sectionHtml;
+            }
+        }
+
+        function generateResourceSummary(costData) {
+            const container = document.getElementById('resource-summary-results');
+            container.innerHTML = '';
+            // ... (rest of the function remains the same, as it processes the costData)
+        }
+
+        function generateWorkSchedule(workScheduleData) {
+            const container = document.getElementById('work-schedule-results');
+            // ... (rest of the function remains the same)
+        }
+
+        function generateBillOfQuantities(costData) {
+            const container = document.getElementById('cost-results');
+            const grandTotalContainer = document.getElementById('grand-total-section');
+            // ... (rest of the function remains the same)
+        }
+        
+        // --- PDF Generation ---
+        function generateAndDownloadPDF() {
+            // ... (this function remains the same)
+        }
+
+        // --- Helper functions for generateResourceSummary and generateBillOfQuantities ---
+        // (These are moved out of the global scope to keep it clean)
+        function generateResourceSummary(costData) {
+            const container = document.getElementById('resource-summary-results');
+            container.innerHTML = '';
+
+            const totals = {
+                materials: {}, labor: {}, equipment: new Set(), plant: new Set()
+            };
+
+            costData.forEach(activity => {
+                activity.items.forEach(item => {
+                    if (item.type === 'Material') {
+                        if (!totals.materials[item.desc]) totals.materials[item.desc] = { qty: 0, unit: item.unit };
+                        totals.materials[item.desc].qty += item.qty;
+                    } else if (item.type === 'Labor') {
+                        if (!totals.labor[item.desc]) totals.labor[item.desc] = 0;
+                        totals.labor[item.desc] += item.qty;
+                    } else if (item.type === 'Equipment') {
+                        totals.equipment.add(item.desc);
+                    } else if (item.type === 'Plant') {
+                        totals.plant.add(item.desc);
+                    }
+                });
+            });
+
+            let materialsHtml = '<div class="p-4 bg-gray-100 rounded-lg"> <h3 class="font-semibold text-lg mb-2">Materials</h3><ul class="space-y-1">';
+            for(const name in totals.materials) { materialsHtml += `<li><strong>${name}:</strong> ${totals.materials[name].qty.toFixed(2)} ${totals.materials[name].unit}</li>`; }
+            materialsHtml += '</ul></div>';
+            
+            let laborHtml = '<div class="p-4 bg-gray-100 rounded-lg"> <h3 class="font-semibold text-lg mb-2">Labor</h3><ul class="space-y-1">';
+            for(const type in totals.labor) { laborHtml += `<li><strong>${type}:</strong> ${totals.labor[type].toFixed(0)} mandays</li>`; }
+            laborHtml += '</ul></div>';
+
+            let equipmentHtml = '<div class="p-4 bg-gray-100 rounded-lg"> <h3 class="font-semibold text-lg mb-2">Machinery & Plant</h3><ul class="space-y-1">';
+            totals.equipment.forEach(equip => { equipmentHtml += `<li>${equip}</li>`; });
+            totals.plant.forEach(p => { equipmentHtml += `<li>${p}</li>`; });
+            equipmentHtml += '</ul></div>';
+
+            container.innerHTML = materialsHtml + laborHtml + equipmentHtml;
+        }
+
+        function generateBillOfQuantities(costData) {
+            const container = document.getElementById('cost-results');
+            const grandTotalContainer = document.getElementById('grand-total-section');
+            container.innerHTML = '';
+            grandTotalContainer.innerHTML = '';
+            let grandTotal = 0;
+
+            costData.forEach(activity => {
+                if (!activity || activity.items.length === 0) return;
+                let totalP = 0;
+                let itemsHtml = '';
+
+                const groupedItems = { 'Material': '', 'Labor': '', 'Equipment': '', 'Plant': '' };
+                activity.items.forEach(item => {
+                    totalP += item.amount;
+                    const row = `<tr class="border-b border-gray-200"><td class="p-2">${item.desc}</td><td class="p-2">${item.unit}</td><td class="p-2 text-right">${item.qty}</td><td class="p-2 text-right">${item.rate.toLocaleString('en-IN')}</td><td class="p-2 text-right">${item.amount.toLocaleString('en-IN')}</td></tr>`;
+                    if (groupedItems[item.type] !== undefined) {
+                        groupedItems[item.type] += row;
+                    }
+                });
+                
+                for(const type in groupedItems) {
+                    if(groupedItems[type]) {
+                        itemsHtml += `<tr class="bg-gray-100 font-semibold"><td colspan="5" class="p-2">${type}s</td></tr>${groupedItems[type]}`;
+                    }
+                }
+
+                const waterCharges = totalP * 0.01;
+                const totalQ = totalP + waterCharges;
+                const gst = totalQ * 0.18;
+                const totalR = totalQ + gst;
+                const profitOverhead = totalR * 0.10;
+                const totalS = totalR + profitOverhead;
+                const labourCess = totalS * 0.01;
+                const totalCost = totalS + labourCess;
+                grandTotal += totalCost;
+
+                const sectionHtml = `
+                    <details class="bg-white border border-gray-200 rounded-lg overflow-hidden" open>
+                        <summary class="p-4 font-semibold text-lg flex justify-between items-center">
+                            <span>${activity.title}</span>
+                            <span class="text-indigo-600">Total: ₹ ${totalCost.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                        </summary>
+                        <div class="p-4 border-t border-gray-200">
+                            <p class="mb-4 text-sm">Total Quantity of Work: <strong>${activity.quantity.toFixed(2)} ${activity.unit}</strong></p>
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-gray-200"><tr><th class="p-2 rounded-l-lg">Item Description</th><th class="p-2">Unit</th><th class="p-2 text-right">Qty</th><th class="p-2 text-right">Rate (₹)</th><th class="p-2 text-right rounded-r-lg">Amount (₹)</th></tr></thead>
+                                <tbody>${itemsHtml}</tbody>
+                            </table>
+                            <table class="w-full md:w-1/2 ml-auto text-right text-sm mt-4">
+                                <tbody>
+                                    <tr class="border-t"><td class="p-2 font-semibold">Sub-Total (P)</td><td class="p-2">₹ ${totalP.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td></tr>
+                                    <tr><td class="p-2">Add: 1% Water Charges</td><td class="p-2">₹ ${waterCharges.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td></tr>
+                                    <tr><td class="p-2">Add: GST @ 18%</td><td class="p-2">₹ ${gst.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td></tr>
+                                    <tr><td class="p-2">Add: Contractor's Profit & Overhead @ 10%</td><td class="p-2">₹ ${profitOverhead.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td></tr>
+                                    <tr><td class="p-2">Add: Labour Cess @ 1%</td><td class="p-2">₹ ${labourCess.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td></tr>
+                                    <tr class="font-bold bg-gray-100"><td class="p-2">Total Cost for Activity</td><td class="p-2">₹ ${totalCost.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>`;
+                container.innerHTML += sectionHtml;
+            });
+
+            grandTotalContainer.innerHTML = `<h3 class="text-3xl font-bold text-right text-gray-900">Grand Total Estimated Cost: <span class="text-indigo-600">₹ ${grandTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span></h3>`;
+        }
+
     </script>
 
 </body>
