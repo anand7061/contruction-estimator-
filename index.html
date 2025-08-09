@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Construction Quantity & Cost Estimator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Added html2pdf library for direct PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .card {
+            background-color: #ffffff;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .btn {
+            display: inline-block;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.3s, color 0.3s;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background-color: #4f46e5;
+            color: #ffffff;
+        }
+        .btn-primary:hover {
+            background-color: #4338ca;
+        }
+        .btn-disabled {
+            background-color: #e0e7ff;
+            color: #a5b4fc;
+            cursor: not-allowed;
+        }
+        .file-input-label {
+            display: block;
+            padding: 1rem;
+            border: 2px dashed #d1d5db;
+            border-radius: 0.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        .file-input-label:hover {
+            border-color: #4f46e5;
+        }
+        #fileName {
+            margin-top: 1rem;
+            font-style: italic;
+            color: #6b7280;
+        }
+        .estimation-section {
+            display: none;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #4f46e5;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 2rem auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        details > summary {
+            list-style: none;
+            cursor: pointer;
+        }
+        details > summary::-webkit-details-marker {
+            display: none;
+        }
+        .pdf-page-break {
+            page-break-before: always;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900">Construction Estimator Pro</h1>
+            <p class="text-lg text-gray-600 mt-2">From Blueprint to Budget: A Seamless Estimation Experience</p>
+        </header>
+
+        <!-- File Upload Section -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-4">1. Upload Your Plan</h2>
+            <p class="mb-4 text-gray-600">Provide your AutoCAD layout file (.dwg, .dxf) or a PDF of your plan. The tool will analyze the dimensions to estimate quantities.</p>
+            <label for="file-upload" class="file-input-label">
+                <div>
+                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <span class="mt-2 block text-sm font-medium text-gray-900">Click to upload a file</span>
+                    <span class="block text-xs text-gray-500">DWG, DXF, PDF up to 10MB</span>
+                </div>
+                <input id="file-upload" name="file-upload" type="file" class="sr-only">
+            </label>
+            <p id="fileName" class="text-center"></p>
+            <div class="mt-6 text-center">
+                <button id="calculate-btn" class="btn btn-primary btn-disabled" disabled>Calculate Estimation</button>
+            </div>
+        </div>
+
+        <div id="loading-spinner" style="display: none;">
+            <div class="loader"></div>
+            <p class="text-center text-gray-600">Analyzing layout and generating detailed estimation...</p>
+        </div>
+        
+        <!-- Wrapper for the entire report -->
+        <div id="estimation-report">
+            <!-- Quantity Estimation Section -->
+            <div id="quantity-estimation-section" class="card estimation-section">
+                <h2 class="text-2xl font-semibold mb-4">2. Quantity Estimation</h2>
+                <p class="mb-6 text-gray-600">A meticulous, step-by-step analysis of all materials required for the project, generated from the provided layout.</p>
+                <div id="quantity-results" class="space-y-4">
+                    <!-- Dynamic Quantity Results will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Resource Summary Section -->
+            <div id="resource-summary-section" class="card estimation-section">
+                <h2 class="text-2xl font-semibold mb-4">3. Resource & Machinery Summary</h2>
+                <p class="mb-6 text-gray-600">A consolidated summary of all materials, labor, and equipment needed for the entire project.</p>
+                <div id="resource-summary-results" class="grid md:grid-cols-3 gap-6">
+                    <!-- Dynamic Resource Summary will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Work Schedule Section -->
+            <div id="work-schedule-section" class="card estimation-section">
+                <h2 class="text-2xl font-semibold mb-4">4. Project Schedule & Daily Workforce Plan</h2>
+                <p class="mb-6 text-gray-600">A high-level schedule outlining major construction phases, their duration, and daily labor requirements.</p>
+                <div id="work-schedule-results">
+                    <!-- Dynamic Work Schedule will be inserted here -->
+                </div>
+            </div>
+
+
+            <!-- Cost Estimation / Bill of Quantity Section -->
+            <div id="cost-estimation-section" class="card estimation-section">
+                <h2 class="text-2xl font-semibold mb-4">5. Bill of Quantities (BoQ) & Cost Estimation</h2>
+                <p class="mb-6 text-gray-600">A detailed cost breakdown for each activity, including materials, labor, and indirect costs, calculated as per standard IS codes and rate analysis.</p>
+                <div id="cost-results" class="space-y-6">
+                    <!-- Dynamic Cost Results will be inserted here -->
+                </div>
+                <div id="grand-total-section" class="mt-8 pt-4 border-t-2 border-gray-200">
+                    <!-- Grand Total will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Print button outside the report wrapper -->
+        <div id="print-button-container" class="card estimation-section text-center">
+             <button id="pdf-button" class="btn btn-primary" onclick="generateAndDownloadPDF()">Generate & Download PDF Report</button>
+        </div>
+    </div>
+
+    <script>
+        // --- EVENT LISTENERS ---
+        const fileUpload = document.getElementById('file-upload');
+        const calculateBtn = document.getElementById('calculate-btn');
+        const fileNameDisplay = document.getElementById('fileName');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const quantitySection = document.getElementById('quantity-estimation-section');
+        const resourceSection = document.getElementById('resource-summary-section');
+        const scheduleSection = document.getElementById('work-schedule-section');
+        const costSection = document.getElementById('cost-estimation-section');
+        const printButtonContainer = document.getElementById('print-button-container');
+
+        fileUpload.addEventListener('change', function() {
+            if (this.files[0]) {
+                fileNameDisplay.textContent = `Selected file: ${this.files[0].name}`;
+                calculateBtn.disabled = false;
+                calculateBtn.classList.remove('btn-disabled');
+            }
+        });
+
+        calculateBtn.addEventListener('click', function() {
+            loadingSpinner.style.display = 'block';
+            quantitySection.style.display = 'none';
+            resourceSection.style.display = 'none';
+            scheduleSection.style.display = 'none';
+            costSection.style.display = 'none';
+            printButtonContainer.style.display = 'none';
+            
+            // Simulate processing time
+            setTimeout(() => {
+                generateQuantityEstimation();
+                generateResourceSummary();
+                generateWorkSchedule();
+                generateBillOfQuantities();
+                loadingSpinner.style.display = 'none';
+                quantitySection.style.display = 'block';
+                resourceSection.style.display = 'block';
+                scheduleSection.style.display = 'block';
+                costSection.style.display = 'block';
+                printButtonContainer.style.display = 'block';
+            }, 2500);
+        });
+
+        // --- DATA STRUCTURES (Simulated from layout analysis) ---
+        const quantityData = {
+            excavation: { title: "Earthwork in Excavation", unit: "m³", total: 80.34, items: [
+                { desc: "Long Walls (0.3m thick)", no: 2, l: 17, b: 0.8, h: 1.1, qty: 29.92 },
+                { desc: "Short Walls (0.15m thick)", no: 1, l: 10, b: 0.8, h: 1.1, qty: 8.8 },
+                { desc: "Bed Room Walls", no: 4, l: 3.6, b: 0.8, h: 1.1, qty: 12.76 },
+                { desc: "Other Interior Walls", no: 8, l: 3.0, b: 0.8, h: 1.1, qty: 21.12 },
+                 { desc: "Foundation Footings", no: 12, l: 1.5, b: 1.5, h: 0.3, qty: 7.74 },
+            ]},
+            sandFilling: { title: "Sand Filing in Plinth", unit: "m³", total: 58.99, items: [
+                { desc: "Drawing Room", no: 1, l: 4.2, b: 3.75, h: 0.58, qty: 9.135 },
+                { desc: "Living Room", no: 1, l: 4.7, b: 7.49, h: 0.58, qty: 20.42 },
+                { desc: "Bedroom (x2)", no: 2, l: 3.7, b: 3.55, h: 0.58, qty: 15.24 },
+                { desc: "Kitchen", no: 1, l: 2.67, b: 2.2, h: 0.58, qty: 3.41 },
+                { desc: "Other Areas", no: 1, l: 18.2, b: 1.0, h: 0.58, qty: 10.785 },
+            ]},
+            pcc: { title: "PCC in Foundation (M15 Grade)", unit: "m³", total: 16.41, items: [
+                 { desc: "Under Foundation Footings", no: 12, l: 1.6, b: 1.6, h: 0.15, qty: 4.61 },
+                 { desc: "Under Ground Floor Slab", no: 1, l: 17, b: 10, h: 0.075, qty: 11.80 },
+            ]},
+            brickwork: { title: "1st Class Brick Masonry", unit: "m³", total: 125.05, items: [
+                 { desc: "Foundation and Plinth", no: 1, l: null, b: null, h: null, qty: 50.25 },
+                 { desc: "Superstructure (Ground & First Floor)", no: 1, l: null, b: null, h: null, qty: 74.80 },
+            ]},
+             rcc: { title: "Reinforced Cement Concrete (M25 Grade)", unit: "m³", total: 55.90, items: [
+                 { desc: "Columns", no: 1, l: null, b: null, h: null, qty: 8.73 },
+                 { desc: "Beams", no: 1, l: null, b: null, h: null, qty: 9.48 },
+                 { desc: "Slabs (GF & FF)", no: 1, l: null, b: null, h: null, qty: 29.25 },
+                 { desc: "Stairs", no: 1, l: null, b: null, h: null, qty: 8.44 },
+            ]},
+        };
+
+        const costData = [
+            {
+                title: "Excavation",
+                quantity: 80.34,
+                unit: "m³",
+                items: [
+                    { desc: "JCB/Excavator", type: "Equipment", unit: "Hours", qty: 7, rate: 2500, amount: 17500 },
+                    { desc: "Tractor with trolley", type: "Equipment", unit: "Hours", qty: 3, rate: 1000, amount: 3000 },
+                    { desc: "Mason", type: "Labor", unit: "mandays", qty: 5, rate: 816, amount: 4080 },
+                    { desc: "Mazdoor", type: "Labor", unit: "mandays", qty: 8, rate: 736, amount: 5888 },
+                    { desc: "Misc. Tools", type: "Plant", unit: "LS", qty: 1, rate: 1000, amount: 1000 },
+                ]
+            },
+            {
+                title: "PCC in Foundation",
+                quantity: 16.41,
+                unit: "m³",
+                items: [
+                     { desc: "Cement", type: "Material", unit: "bags", qty: 95, rate: 450, amount: 42750 },
+                     { desc: "Coarse Sand", type: "Material", unit: "m³", qty: 7.5, rate: 1450, amount: 10875 },
+                     { desc: "Stone Aggregate", type: "Material", unit: "m³", qty: 15, rate: 1425, amount: 21375 },
+                     { desc: "Mason", type: "Labor", unit: "mandays", qty: 8, rate: 816, amount: 6528 },
+                     { desc: "Mazdoor", type: "Labor", unit: "mandays", qty: 25, rate: 736, amount: 18400 },
+                     { desc: "Concrete Mixer", type: "Equipment", unit: "day", qty: 2, rate: 800, amount: 1600 },
+                ]
+            },
+            {
+                title: "Reinforced Cement Concrete (RCC)",
+                quantity: 55.90,
+                unit: "m³",
+                items: [
+                     { desc: "Cement", type: "Material", unit: "bags", qty: 475, rate: 450, amount: 213750 },
+                     { desc: "Steel Reinforcement", type: "Material", unit: "Tonne", qty: 4.5, rate: 65000, amount: 292500 },
+                     { desc: "Coarse Sand", type: "Material", unit: "m³", qty: 25, rate: 1800, amount: 45000 },
+                     { desc: "Stone Aggregate", type: "Material", unit: "m³", qty: 50, rate: 1600, amount: 80000 },
+                     { desc: "Mason", type: "Labor", unit: "mandays", qty: 30, rate: 857, amount: 25710 },
+                     { desc: "Mazdoor", type: "Labor", unit: "mandays", qty: 80, rate: 736, amount: 58880 },
+                     { desc: "Bar Bender", type: "Labor", unit: "mandays", qty: 40, rate: 900, amount: 36000 },
+                ]
+            },
+             {
+                title: "Plastering (Inner & Outer)",
+                quantity: 1228.26,
+                unit: "m²",
+                items: [
+                     { desc: "Cement", type: "Material", unit: "bags", qty: 50, rate: 450, amount: 22500 },
+                     { desc: "Mason", type: "Labor", unit: "manday", qty: 15, rate: 816, amount: 12240 },
+                     { desc: "Mazdoor", type: "Labor", unit: "manday", qty: 15, rate: 736, amount: 11040 },
+                     { desc: "Scaffolding", type: "Plant", unit: "LS", qty: 1, rate: 5000, amount: 5000 },
+                ]
+            }
+        ];
+
+        const workScheduleData = [
+            { phase: "Site Clearing & Excavation", duration: 7, labor: [{ type: "Mazdoor", count: 8 }, { type: "Supervisor", count: 1 }] },
+            { phase: "Foundation (PCC & RCC)", duration: 21, labor: [{ type: "Mason", count: 4 }, { type: "Mazdoor", count: 12 }, { type: "Bar Bender", count: 4 }] },
+            { phase: "Superstructure (Columns, Beams, Slabs)", duration: 60, labor: [{ type: "Mason", count: 6 }, { type: "Mazdoor", count: 15 }, { type: "Bar Bender", count: 6 }, { type: "Carpenter", count: 4 }] },
+            { phase: "Brickwork & Plastering", duration: 45, labor: [{ type: "Mason", count: 10 }, { type: "Mazdoor", count: 10 }] },
+            { phase: "Finishing (Flooring, Painting, Electrical)", duration: 30, labor: [{ type: "Painter", count: 5 }, { type: "Tile Mason", count: 4 }, { type: "Electrician", count: 3 }, { type: "Helper", count: 5 }] },
+        ];
+
+
+        // --- HTML GENERATION FUNCTIONS ---
+
+        function generateQuantityEstimation() {
+            const container = document.getElementById('quantity-results');
+            container.innerHTML = ''; 
+
+            for (const key in quantityData) {
+                const data = quantityData[key];
+                let itemsHtml = '';
+                data.items.forEach(item => {
+                    if(item.l !== null) {
+                        itemsHtml += `<li>${item.desc}: ${item.no} units, ${item.l}m x ${item.b}m x ${item.h}m = ${item.qty.toFixed(2)} ${data.unit}</li>`;
+                    } else {
+                        itemsHtml += `<li>${item.desc}: ${item.qty.toFixed(2)} ${data.unit}</li>`;
+                    }
+                });
+
+                const sectionHtml = `
+                    <div class="p-4 bg-gray-100 rounded-lg">
+                        <h3 class="font-semibold text-lg">${data.title}</h3>
+                        <ul class="mt-2 list-disc list-inside text-gray-700">
+                            ${itemsHtml}
+                            <li class="font-bold mt-2">Total: ${data.total.toFixed(2)} ${data.unit}</li>
+                        </ul>
+                    </div>
+                `;
+                container.innerHTML += sectionHtml;
+            }
+        }
+
+        function generateResourceSummary() {
+            const container = document.getElementById('resource-summary-results');
+            container.innerHTML = '';
+
+            const totals = {
+                materials: { "Cement": 0, "Steel Reinforcement": 0, "Coarse Sand": 0, "Stone Aggregate": 0 },
+                labor: {},
+                equipment: new Set()
+            };
+
+            costData.forEach(activity => {
+                activity.items.forEach(item => {
+                    if (item.type === 'Material') {
+                        if (item.desc === 'Cement') totals.materials['Cement'] += item.qty;
+                        else if (item.desc === 'Steel Reinforcement') totals.materials['Steel Reinforcement'] += item.qty;
+                        else if (item.desc === 'Coarse Sand') totals.materials['Coarse Sand'] += item.qty;
+                        else if (item.desc === 'Stone Aggregate') totals.materials['Stone Aggregate'] += item.qty;
+                    } else if (item.type === 'Labor') {
+                        if (!totals.labor[item.desc]) totals.labor[item.desc] = 0;
+                        totals.labor[item.desc] += item.qty;
+                    } else if (item.type === 'Equipment') {
+                        totals.equipment.add(item.desc);
+                    }
+                });
+            });
+
+            // Materials HTML
+            let materialsHtml = '<div class="p-4 bg-gray-100 rounded-lg"> <h3 class="font-semibold text-lg mb-2">Materials</h3><ul class="space-y-1">';
+            materialsHtml += `<li><strong>Cement:</strong> ${totals.materials.Cement.toFixed(0)} bags</li>`;
+            materialsHtml += `<li><strong>Steel (Rods):</strong> ${totals.materials['Steel Reinforcement'].toFixed(2)} Tonne</li>`;
+            materialsHtml += `<li><strong>Sand:</strong> ${totals.materials['Coarse Sand'].toFixed(2)} m³</li>`;
+            materialsHtml += `<li><strong>Aggregate:</strong> ${totals.materials['Stone Aggregate'].toFixed(2)} m³</li>`;
+            materialsHtml += '</ul></div>';
+            
+            // Labor HTML
+            let laborHtml = '<div class="p-4 bg-gray-100 rounded-lg"> <h3 class="font-semibold text-lg mb-2">Labor</h3><ul class="space-y-1">';
+            for(const type in totals.labor) {
+                laborHtml += `<li><strong>${type}:</strong> ${totals.labor[type].toFixed(0)} mandays</li>`;
+            }
+            laborHtml += '</ul></div>';
+
+            // Equipment HTML
+            let equipmentHtml = '<div class="p-4 bg-gray-100 rounded-lg"> <h3 class="font-semibold text-lg mb-2">Machinery</h3><ul class="space-y-1">';
+            totals.equipment.forEach(equip => {
+                equipmentHtml += `<li>${equip}</li>`;
+            });
+            equipmentHtml += '</ul></div>';
+
+            container.innerHTML = materialsHtml + laborHtml + equipmentHtml;
+        }
+
+        function generateWorkSchedule() {
+            const container = document.getElementById('work-schedule-results');
+            let tableHtml = `
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-gray-200">
+                        <tr>
+                            <th class="p-2 rounded-l-lg">Phase</th>
+                            <th class="p-2 text-center">Duration (Days)</th>
+                            <th class="p-2 rounded-r-lg">Daily Workforce Required</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            workScheduleData.forEach(phase => {
+                let laborDetail = phase.labor.map(l => `${l.count} ${l.type}`).join(', ');
+                tableHtml += `
+                    <tr class="border-b">
+                        <td class="p-2 font-medium">${phase.phase}</td>
+                        <td class="p-2 text-center">${phase.duration}</td>
+                        <td class="p-2">${laborDetail}</td>
+                    </tr>
+                `;
+            });
+            tableHtml += '</tbody></table>';
+            container.innerHTML = tableHtml;
+        }
+
+
+        function generateBillOfQuantities() {
+            const container = document.getElementById('cost-results');
+            const grandTotalContainer = document.getElementById('grand-total-section');
+            container.innerHTML = '';
+            grandTotalContainer.innerHTML = '';
+            let grandTotal = 0;
+
+            costData.forEach(activity => {
+                let totalP = 0;
+                let itemsHtml = '';
+
+                const groupedItems = { 'Material': '', 'Labor': '', 'Equipment': '', 'Plant': '' };
+                activity.items.forEach(item => {
+                    totalP += item.amount;
+                    const row = `<tr class="border-b border-gray-200"><td class="p-2">${item.desc}</td><td class="p-2">${item.unit}</td><td class="p-2 text-right">${item.qty}</td><td class="p-2 text-right">${item.rate.toLocaleString('en-IN')}</td><td class="p-2 text-right">${item.amount.toLocaleString('en-IN')}</td></tr>`;
+                    if (groupedItems[item.type] !== undefined) {
+                        groupedItems[item.type] += row;
+                    }
+                });
+                
+                for(const type in groupedItems) {
+                    if(groupedItems[type]) {
+                        itemsHtml += `<tr class="bg-gray-100 font-semibold"><td colspan="5" class="p-2">${type}s</td></tr>${groupedItems[type]}`;
+                    }
+                }
+
+                const waterCharges = totalP * 0.01;
+                const totalQ = totalP + waterCharges;
+                const gst = totalQ * 0.18;
+                const totalR = totalQ + gst;
+                const profitOverhead = totalR * 0.10;
+                const totalS = totalR + profitOverhead;
+                const labourCess = totalS * 0.01;
+                const totalCost = totalS + labourCess;
+                grandTotal += totalCost;
+
+                const sectionHtml = `
+                    <details class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                        <summary class="p-4 font-semibold text-lg flex justify-between items-center">
+                            <span>${activity.title}</span>
+                            <span class="text-indigo-600">Total: ₹ ${totalCost.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                        </summary>
+                        <div class="p-4 border-t border-gray-200">
+                            <p class="mb-4 text-sm">Total Quantity of Work: <strong>${activity.quantity} ${activity.unit}</strong></p>
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-gray-200">
+                                    <tr>
+                                        <th class="p-2 rounded-l-lg">Item Description</th>
+                                        <th class="p-2">Unit</th>
+                                        <th class="p-2 text-right">Qty</th>
+                                        <th class="p-2 text-right">Rate (₹)</th>
+                                        <th class="p-2 text-right rounded-r-lg">Amount (₹)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${itemsHtml}</tbody>
+                            </table>
+                            <table class="w-full md:w-1/2 ml-auto text-right text-sm mt-4">
+                                <tbody>
+                                    <tr class="border-t"><td class="p-2 font-semibold">Sub-Total (P)</td><td class="p-2">₹ ${totalP.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td></tr>
+                                    <tr><td class="p-2">Add: 1% Water Charges (Q)</td><td class="p-2">₹ ${waterCharges.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td></tr>
+                                    <tr><td class="p-2">Add: GST @ 18% (R)</td><td class="p-2">₹ ${gst.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td></tr>
+                                    <tr><td class="p-2">Add: Contractor's Profit & Overhead @ 10% (S)</td><td class="p-2">₹ ${profitOverhead.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td></tr>
+                                    <tr><td class="p-2">Add: Labour Cess @ 1%</td><td class="p-2">₹ ${labourCess.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td></tr>
+                                    <tr class="font-bold bg-gray-100"><td class="p-2">Total Cost for Activity</td><td class="p-2">₹ ${totalCost.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                `;
+                container.innerHTML += sectionHtml;
+            });
+
+            grandTotalContainer.innerHTML = `
+                <h3 class="text-3xl font-bold text-right text-gray-900">
+                    Grand Total Estimated Cost: 
+                    <span class="text-indigo-600">₹ ${grandTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                </h3>
+            `;
+        }
+        
+        function generateAndDownloadPDF() {
+            const pdfButton = document.getElementById('pdf-button');
+            pdfButton.textContent = 'Preparing PDF...';
+            pdfButton.disabled = true;
+            pdfButton.classList.add('btn-disabled');
+
+            // Create a clone of the report element to generate the PDF from.
+            // This avoids modifying the live DOM.
+            const reportClone = document.getElementById('estimation-report').cloneNode(true);
+            
+            // Ensure all sections within the clone are visible
+            reportClone.querySelectorAll('.estimation-section').forEach(el => {
+                el.style.display = 'block';
+            });
+            
+            // Ensure all <details> elements within the clone are open
+            reportClone.querySelectorAll('details').forEach(detail => {
+                detail.setAttribute('open', '');
+            });
+
+            // Add a header to the cloned report for the PDF
+            const pdfHeader = document.createElement('div');
+            pdfHeader.innerHTML = `
+                <div class="text-center mb-8 pt-8">
+                    <h1 class="text-3xl font-bold">Construction Estimation Report</h1>
+                    <p class="text-sm text-gray-500">Generated on: ${new Date().toLocaleDateString()}</p>
+                </div>
+            `;
+            reportClone.prepend(pdfHeader);
+
+            const opt = {
+              margin:       [0.5, 0.5, 0.5, 0.5],
+              filename:     'Construction_Estimation_Report.pdf',
+              image:        { type: 'jpeg', quality: 0.98 },
+              html2canvas:  { scale: 2, useCORS: true, logging: false },
+              jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
+              pagebreak:    { mode: ['css', 'avoid-all'], before: '#resource-summary-section, #work-schedule-section, #cost-estimation-section' }
+            };
+
+            // Use the promise returned by html2pdf to handle post-generation tasks
+            html2pdf().from(reportClone).set(opt).save().then(() => {
+                // Restore the button state after the PDF is saved
+                pdfButton.textContent = 'Generate & Download PDF Report';
+                pdfButton.disabled = false;
+                pdfButton.classList.remove('btn-disabled');
+            }).catch(err => {
+                console.error("PDF Generation Failed:", err);
+                // Restore the button state even if there's an error
+                pdfButton.textContent = 'Generate & Download PDF Report';
+                pdfButton.disabled = false;
+                pdfButton.classList.remove('btn-disabled');
+            });
+        }
+    </script>
+
+</body>
+</html>
